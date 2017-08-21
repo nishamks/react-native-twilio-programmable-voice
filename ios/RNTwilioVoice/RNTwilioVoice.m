@@ -27,6 +27,7 @@
   NSString *_token;
 }
 
+NSString * const StatePending = @"PENDING";
 NSString * const StateConnecting = @"CONNECTING";
 NSString * const StateConnected = @"CONNECTED";
 NSString * const StateDisconnected = @"DISCONNECTED";
@@ -138,7 +139,50 @@ RCT_EXPORT_METHOD(unregister){
   self.deviceTokenString = nil;
 }
 
-
+RCT_REMAP_METHOD(getActiveCall,
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject){
+  NSMutableDictionary *params = [[NSMutableDictionary alloc] init];
+  if (self.callInvite) {
+    if (self.callInvite.callSid){
+      [params setObject:self.callInvite.callSid forKey:@"call_sid"];
+    }
+    if (self.callInvite.from){
+      [params setObject:self.callInvite.from forKey:@"from"];
+    }
+    if (self.callInvite.to){
+      [params setObject:self.callInvite.to forKey:@"to"];
+    }
+    if (self.callInvite.state == TVOCallInviteStatePending) {
+      [params setObject:StatePending forKey:@"call_state"];
+    } else if (self.callInvite.state == TVOCallInviteStateCancelled) {
+      [params setObject:StateDisconnected forKey:@"call_state"];
+    } else if (self.callInvite.state == TVOCallInviteStateRejected) {
+      [params setObject:StateRejected forKey:@"call_state"];
+    }
+    resolve(params);
+  } else if (self.call) {
+    if (self.call.callSid) {
+      [params setObject:self.call.callSid forKey:@"call_sid"];
+    }
+    if (self.call.to){
+      [params setObject:self.call.to forKey:@"call_to"];
+    }
+    if (self.call.from){
+      [params setObject:self.call.from forKey:@"call_from"];
+    }
+    if (self.call.state == TVOCallStateConnected) {
+      [params setObject:StateConnected forKey:@"call_state"];
+    } else if (self.call.state == TVOCallStateConnecting) {
+      [params setObject:StateConnecting forKey:@"call_state"];
+    } else if (self.call.state == TVOCallStateDisconnected) {
+      [params setObject:StateDisconnected forKey:@"call_state"];
+    }
+    resolve(params);
+  } else{
+    reject(@"no_call", @"There was no active call", nil);
+  }
+}
 
 - (void)initPushRegistry {
   self.voipRegistry = [[PKPushRegistry alloc] initWithQueue:dispatch_get_main_queue()];
