@@ -29,11 +29,11 @@ import java.util.Map;
 import java.util.Random;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.TAG;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_CANCEL_CALL;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_FCM_TOKEN;
-import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.INCOMING_CALL_INVITE;
+import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_INCOMING_CALL;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.CANCELLED_CALL_INVITE;
+import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.INCOMING_CALL_INVITE;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.INCOMING_CALL_NOTIFICATION_ID;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.TAG;
 
@@ -164,12 +164,14 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
 
     private void handleIncomingCall(ReactApplicationContext context,
         int notificationId,
-        CallInvite callInvite
+        CallInvite callInvite,
+        Intent launchIntent
     ) {
         Intent intent = new Intent(ACTION_INCOMING_CALL);
         intent.putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId);
         intent.putExtra(INCOMING_CALL_INVITE, callInvite);
         LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+        showNotification(context, callInvite, notificationId, launchIntent);
     }
 
     /*

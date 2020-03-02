@@ -369,6 +369,18 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     Log.e(TAG, String.format("CallListener onDisconnected error: %d, %s",
                         error.getErrorCode(), error.getMessage()));
                 }
+
+                WritableMap params = Arguments.createMap();
+                params.putString("err", error.getMessage());
+                String callSid = "";
+                if (call != null) {
+                    callSid = call.getSid();
+                    params.putString("call_sid", callSid);
+                    params.putString("call_state", call.getState().name());
+                    params.putString("call_from", call.getFrom());
+                    params.putString("call_to", call.getTo());
+                }
+
                 if (callSid != null && activeCall != null && activeCall.getSid() != null && activeCall.getSid().equals(callSid)) {
                     activeCall = null;
                 }
