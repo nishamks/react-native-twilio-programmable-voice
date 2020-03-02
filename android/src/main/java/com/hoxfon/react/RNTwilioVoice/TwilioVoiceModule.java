@@ -361,17 +361,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 Intent intent = new Intent(ACTION_DISCONNECTED_CALL);
                 LocalBroadcastManager.getInstance(reactContext).sendBroadcast(intent);
 
-                String callSid = "";
-                if (call != null) {
-                    callSid = call.getSid();
-                }
-                if (error != null) {
-                    Log.e(TAG, String.format("CallListener onDisconnected error: %d, %s",
-                        error.getErrorCode(), error.getMessage()));
-                }
-
                 WritableMap params = Arguments.createMap();
                 params.putString("err", error.getMessage());
+
                 String callSid = "";
                 if (call != null) {
                     callSid = call.getSid();
@@ -379,6 +371,11 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     params.putString("call_state", call.getState().name());
                     params.putString("call_from", call.getFrom());
                     params.putString("call_to", call.getTo());
+
+                }
+                if (error != null) {
+                    Log.e(TAG, String.format("CallListener onDisconnected error: %d, %s",
+                        error.getErrorCode(), error.getMessage()));
                 }
 
                 if (callSid != null && activeCall != null && activeCall.getSid() != null && activeCall.getSid().equals(callSid)) {
