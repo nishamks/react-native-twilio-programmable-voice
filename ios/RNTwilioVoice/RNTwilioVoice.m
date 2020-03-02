@@ -836,5 +836,34 @@ RCT_REMAP_METHOD(getActiveCall,
   }
 }
 
+- (void)performVoiceCallWithUUID:(NSUUID *)uuid
+                          client:(NSString *)client
+                      completion:(void(^)(BOOL success))completionHandler {
+
+    self.call = [TwilioVoice call:[self fetchAccessToken]
+                                            params:_callParams
+                                              uuid:uuid
+                                          delegate:self];
+
+    self.callKitCompletionCallback = completionHandler;
+}
+
+- (void)performAnswerVoiceCallWithUUID:(NSUUID *)uuid
+                            completion:(void(^)(BOOL success))completionHandler {
+
+    self.call = [self.callInvite acceptWithDelegate:self];
+    self.callInvite = nil;
+    self.callKitCompletionCallback = completionHandler;
+}
+
+- (void)handleAppTerminateNotification {
+  NSLog(@"handleAppTerminateNotification called");
+
+  if (self.call) {
+    NSLog(@"handleAppTerminateNotification disconnecting an active call");
+    [self.call disconnect];
+  }
+}
+
 @end
 

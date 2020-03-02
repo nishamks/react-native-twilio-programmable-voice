@@ -2,17 +2,26 @@
 
 buildscript {
     repositories {
+<<<<<<< HEAD
         maven { url 'https://maven.fabric.io/public' }
         maven {
             url 'https://maven.google.com'
             name 'Google'
         }
+=======
+        google()
+>>>>>>> 05e974efc512a9435cf5dc7bec8705b23a7590df
         jcenter()
         google()
     }
     dependencies {
+<<<<<<< HEAD
         classpath 'com.android.tools.build:gradle:3.4.2'
         classpath 'com.google.gms:google-services:4.3.3'
+=======
+        classpath 'com.android.tools.build:gradle:3.5.2'
+        classpath 'com.google.gms:google-services:4.2.0'
+>>>>>>> 05e974efc512a9435cf5dc7bec8705b23a7590df
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -21,7 +30,11 @@ buildscript {
 
 allprojects {
     repositories {
+<<<<<<< HEAD
         mavenLocal()
+=======
+        google()
+>>>>>>> 05e974efc512a9435cf5dc7bec8705b23a7590df
         jcenter()
         google()
         maven { url "https://jitpack.io" }
@@ -38,12 +51,17 @@ allprojects {
 
 apply plugin: 'com.android.library'
 
+def DEFAULT_COMPILE_SDK_VERSION = 28
+def DEFAULT_BUILD_TOOLS_VERSION = "28.0.3"
+def DEFAULT_TARGET_SDK_VERSION = 28
+def DEFAULT_SUPPORT_LIB_VERSION = "28.0.3"
+
 android {
-    compileSdkVersion 27
-    buildToolsVersion "27.0.3"
+    compileSdkVersion rootProject.hasProperty('compileSdkVersion') ? rootProject.compileSdkVersion : DEFAULT_COMPILE_SDK_VERSION
+    buildToolsVersion rootProject.hasProperty('buildToolsVersion') ? rootProject.buildToolsVersion : DEFAULT_BUILD_TOOLS_VERSION
     defaultConfig {
         minSdkVersion 16
-        targetSdkVersion 27
+        targetSdkVersion rootProject.hasProperty('targetSdkVersion') ? rootProject.targetSdkVersion : DEFAULT_TARGET_SDK_VERSION
         versionCode 1
         versionName "1.0"
         vectorDrawables.useSupportLibrary = true
@@ -58,7 +76,7 @@ android {
 
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation 'com.twilio:voice-android:4+'
+    implementation 'com.twilio:voice-android:5.0.2'
     implementation 'com.facebook.react:react-native:+'
     implementation 'com.google.firebase:firebase-messaging:17.+'
     implementation 'com.squareup.retrofit2:retrofit:2.4.0'

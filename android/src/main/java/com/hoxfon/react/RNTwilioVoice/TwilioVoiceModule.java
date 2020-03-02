@@ -2,6 +2,7 @@ package com.hoxfon.react.RNTwilioVoice;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ActivityManager.RunningAppProcessInfo;
 import android.app.NotificationManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
@@ -15,10 +16,15 @@ import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.os.Build;
 import android.os.Handler;
+import android.util.Log;
+import android.view.Window;
+import android.view.WindowManager;
+
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-import android.util.Log;
+
 import com.facebook.react.bridge.ActivityEventListener;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.AssertionException;
@@ -29,17 +35,24 @@ import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
 import com.facebook.react.bridge.ReactMethod;
+import com.facebook.react.bridge.ReadableMap;
+import com.facebook.react.bridge.ReadableMapKeySetIterator;
+import com.facebook.react.bridge.ReadableType;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.modules.storage.AsyncLocalStorageUtil;
 import com.facebook.react.modules.storage.ReactDatabaseSupplier;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.iid.FirebaseInstanceId;
+import com.google.firebase.iid.InstanceIdResult;
 import com.hoxfon.react.RNTwilioVoice.screens.AutomaticCallScreenActivity;
 import com.hoxfon.react.RNTwilioVoice.screens.DirectCallScreenActivity;
 import com.hoxfon.react.RNTwilioVoice.screens.UnlockScreenActivity;
 import com.twilio.voice.Call;
 import com.twilio.voice.CallException;
 import com.twilio.voice.CallInvite;
+import com.twilio.voice.ConnectOptions;
 import com.twilio.voice.LogLevel;
 import com.twilio.voice.RegistrationException;
 import com.twilio.voice.RegistrationListener;
@@ -61,12 +74,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     public static String TAG = "RNTwilioVoice";
 
     private static final int MIC_PERMISSION_REQUEST_CODE = 1;
-
-    private AudioManager audioManager;
-    private int originalAudioMode = AudioManager.MODE_NORMAL;
-
-    private boolean isReceiverRegistered = false;
-    private VoiceBroadcastReceiver voiceBroadcastReceiver;
 
     public static final String INCOMING_CALL_INVITE          = "INCOMING_CALL_INVITE";
     public static final String INCOMING_CALL_NOTIFICATION_ID = "INCOMING_CALL_NOTIFICATION_ID";
@@ -97,6 +104,12 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     public static final int HANGUP_NOTIFICATION_ID = 11;
     public static final int CLEAR_MISSED_CALLS_NOTIFICATION_ID = 21;
 
+    private AudioManager audioManager;
+    private int originalAudioMode = AudioManager.MODE_NORMAL;
+
+    private boolean isReceiverRegistered = false;
+    private VoiceBroadcastReceiver voiceBroadcastReceiver;
+
     private String savedDigit = null;
 
     public static final String PREFERENCE_KEY = "com.hoxfon.react.TwilioVoice.PREFERENCE_FILE_KEY";
@@ -126,8 +139,17 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     private ReactContext reactContext;
 
+    // Empty HashMap, contains parameters for the Outbound call
+    private HashMap<String, String> twiMLParams = new HashMap<>();
+    private ProximityManager proximityManager;
+    
+    // this variable determines when to create missed calls notifications
+    private HeadsetManager headsetManager;
+    private int savedAudioMode = AudioManager.MODE_INVALID;
+
     public TwilioVoiceModule(ReactApplicationContext reactContext,
             boolean shouldAskForMicPermission, String baseUrl, String s3Url) {
+
         super(reactContext);
         if (BuildConfig.DEBUG) {
             Voice.setLogLevel(LogLevel.DEBUG);
@@ -142,6 +164,8 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
         eventManager = new EventManager(reactContext);
         callNotificationManager = new CallNotificationManager();
+        proximityManager = new ProximityManager(reactContext, eventManager);
+        headsetManager = new HeadsetManager(eventManager);
 
         SharedPreferences sharedPref = getReactApplicationContext().getSharedPreferences("com.hoxfon.react.RNTwilioVoice.config", Context.MODE_PRIVATE);
         SharedPreferences.Editor sharedPrefEditor = sharedPref.edit();
@@ -164,6 +188,13 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
          * Needed for setting/abandoning audio focus during a call
          */
         audioManager = (AudioManager) reactContext.getSystemService(Context.AUDIO_SERVICE);
+
+        /*
+         * Ensure the microphone permission is enabled
+         */
+        if (shouldAskForMicPermission && !checkPermissionForMicrophone()) {
+            requestPermissionForMicrophone();
+        }
     }
 
     @Override
@@ -185,7 +216,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
     public void onHostDestroy() {
         disconnect();
         callNotificationManager.removeHangupNotification(getReactApplicationContext());
-        unsetAudioFocus();
+        setAudioFocus(false);
     }
 
     @Override
@@ -243,6 +274,24 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
     private Call.Listener callListener() {
         return new Call.Listener() {
+            /*
+             * This callback is emitted once before the Call.Listener.onConnected() callback when
+             * the callee is being alerted of a Call. The behavior of this callback is determined by
+             * the answerOnBridge flag provided in the Dial verb of your TwiML application
+             * associated with this client. If the answerOnBridge flag is false, which is the
+             * default, the Call.Listener.onConnected() callback will be emitted immediately after
+             * Call.Listener.onRinging(). If the answerOnBridge flag is true, this will cause the
+             * call to emit the onConnected callback only after the call is answered.
+             * See answeronbridge for more details on how to use it with the Dial TwiML verb. If the
+             * twiML response contains a Say verb, then the call will emit the
+             * Call.Listener.onConnected callback immediately after Call.Listener.onRinging() is
+             * raised, irrespective of the value of answerOnBridge being set to true or false
+             */
+            @Override
+            public void onRinging(Call call) {
+                Log.d(TAG, "Ringing");
+            }
+
             @Override
             public void onRinging(Call call) {
                 Log.d(TAG, "Ringing");
@@ -251,20 +300,39 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             @Override
             public void onConnected(Call call) {
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "CALL CONNECTED callListener().onConnected call state = "+call.getState());
+                    Log.d(TAG, "CALL CONNECTED callListener().onConnected call state = " + call.getState());
                 }
-                setAudioFocus();
 
+                setAudioFocus(true);
+                
                 Log.d(TAG, "CALL STATE " + call.getState());
 
+                proximityManager.startProximitySensor();
+                headsetManager.startWiredHeadsetEvent(getReactApplicationContext());
+
+                WritableMap params = Arguments.createMap();
                 if (call != null) {
+                    params.putString("call_sid", call.getSid());
+                    params.putString("call_state", call.getState().name());
+                    params.putString("call_from", call.getFrom());
+                    params.putString("call_to", call.getTo());
+                    String caller = "Show call details in the app";
+                    if (!toName.equals("")) {
+                        caller = toName;
+                    } else if (!toNumber.equals("")) {
+                        caller = toNumber;
+                    }
                     activeCall = call;
+                   callNotificationManager.createHangupLocalNotification(getReactApplicationContext(),
+                           call.getSid(), caller);
                 }
 
                 if (savedDigit != null) {
                     sendDigits(savedDigit);
                     savedDigit = null;
                 }
+
+                eventManager.sendEvent(EVENT_CONNECTION_DID_CONNECT, params);
             }
 
             @Override
@@ -279,7 +347,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
             @Override
             public void onDisconnected(Call call, CallException error) {
-                unsetAudioFocus();
+                setAudioFocus(false);
+                proximityManager.stopProximitySensor();
+                headsetManager.stopWiredHeadsetEvent(getReactApplicationContext());
                 callAccepted = false;
 
                 Log.d(TAG, "Call has been disconnected");
@@ -302,13 +372,17 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 if (callSid != null && activeCall != null && activeCall.getSid() != null && activeCall.getSid().equals(callSid)) {
                     activeCall = null;
                 }
+
+                eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
+                callNotificationManager.removeHangupNotification(getReactApplicationContext());
                 toNumber = "";
                 toName = "";
             }
 
             @Override
             public void onConnectFailure(Call call, CallException error) {
-                unsetAudioFocus();
+                setAudioFocus(false);
+                proximityManager.stopProximitySensor();
                 callAccepted = false;
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "connect failure");
@@ -333,6 +407,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 if (callSid != null && activeCall != null && activeCall.getSid() != null && activeCall.getSid().equals(callSid)) {
                     activeCall = null;
                 }
+                eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
                 callNotificationManager.removeHangupNotification(getReactApplicationContext());
                 toNumber = "";
                 toName = "";
@@ -460,55 +535,80 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             Log.e(TAG, "handleIncomingCallIntent intent is null");
             return;
         }
-
+    
         if (!checkPermissionForMicrophone()) {
             Log.e(TAG, "Permissions for microphone have been disabled");
             return;
         }
-
-        if (intent.getAction().equals(ACTION_INCOMING_CALL) && !callAccepted) {
+    
+        if (intent.getAction().equals(ACTION_INCOMING_CALL)) {
             activeCallInvite = intent.getParcelableExtra(INCOMING_CALL_INVITE);
-
+    
             if (activeCallInvite != null) {
                 callAccepted = false;
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "handleIncomingCallIntent state = PENDING");
                 }
                 SoundPoolManager.getInstance(getReactApplicationContext()).playRinging();
+    
+                if (getReactApplicationContext().getCurrentActivity() != null) {
+                    Window window = getReactApplicationContext().getCurrentActivity().getWindow();
+                    window.addFlags(WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                            | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    );
+                }
+    
                 showUnlockScreen();
+    
+                // send a JS event ONLY if the app's importance is FOREGROUND or SERVICE
+                // at startup the app would try to fetch the activeIncoming calls
+                int appImportance = callNotificationManager.getApplicationImportance(getReactApplicationContext());
+                if (appImportance == RunningAppProcessInfo.IMPORTANCE_FOREGROUND ||
+                        appImportance == RunningAppProcessInfo.IMPORTANCE_SERVICE) {
+                    WritableMap params = Arguments.createMap();
+                    params.putString("call_sid", activeCallInvite.getCallSid());
+                    params.putString("call_from", activeCallInvite.getFrom());
+                    params.putString("call_to", activeCallInvite.getTo());
+                    params.putString("call_state", "PENDING");
+                    eventManager.sendEvent(EVENT_DEVICE_DID_RECEIVE_INCOMING, params);
+                }
+    
             } else {
+               Log.d(TAG, "Should this be called at all?");
+            }
+        }  else if (intent.getAction().equals(ACTION_CANCEL_CALL)) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "====> BEGIN handleIncomingCallIntent when activeCallInvite != PENDING");
+            }
+            // this block is executed when the callInvite is cancelled and:
+            //   - the call is answered (activeCall != null)
+            //   - the call is rejected
+    
+            SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
+    
+            if (BuildConfig.DEBUG) {
+                // Log.d(TAG, "activeCallInvite state = " + activeCallInvite.getState());
+            }
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "activeCallInvite was cancelled by " + activeCallInvite.getFrom());
+            }
+            if (!callAccepted) {
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "====> BEGIN handleIncomingCallIntent when activeCallInvite != PENDING");
+                    Log.d(TAG, "creating a missed call");
                 }
-                // this block is executed when the callInvite is cancelled and:
-                //   - the call is answered (activeCall != null)
-                //   - the call is rejected
-
-                Intent disconnectIntent = new Intent(ACTION_DISCONNECTED_CALL);
-                LocalBroadcastManager.getInstance(reactContext).sendBroadcast(disconnectIntent);
-
-                SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
-
-                // the call is not active yet
-                if (activeCall == null) {
-
-                    if (activeCallInvite != null) {
-                        if (BuildConfig.DEBUG) {
-                            Log.d(TAG, "activeCallInvite was cancelled by " + activeCallInvite.getFrom());
-                        }
-                        if (!callAccepted) {
-                            callNotificationManager.createMissedCallNotification(getReactApplicationContext(), activeCallInvite);
-                        }
-                    }
-                } else {
-                    if (BuildConfig.DEBUG) {
-                        Log.d(TAG, "activeCallInvite was answered. Call " + activeCall);
-                    }
-                }
-                if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "====> END");
+                callNotificationManager.createMissedCallNotification(getReactApplicationContext(), activeCallInvite);
+                int appImportance = callNotificationManager.getApplicationImportance(getReactApplicationContext());
+                if (appImportance != RunningAppProcessInfo.IMPORTANCE_BACKGROUND) {
+                    WritableMap params = Arguments.createMap();
+                    params.putString("call_sid", activeCallInvite.getCallSid());
+                    params.putString("call_from", activeCallInvite.getFrom());
+                    params.putString("call_to", activeCallInvite.getTo());
+                    params.putString("call_state", "DISCONNECTED");
+                    eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
                 }
             }
+    
+            clearIncomingNotification(activeCallInvite);
         } else if (intent.getAction().equals(ACTION_FCM_TOKEN)) {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "handleIncomingCallIntent ACTION_FCM_TOKEN");
@@ -529,7 +629,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 reject();
             } else if (action.equals(ACTION_INCOMING_CALL)) {
                 if (BuildConfig.DEBUG) {
-                    Log.d(TAG, "VoiceBroadcastReceiver.onReceive ACTION_INCOMING_CALL. Intent "+ intent.getExtras());
+                    Log.d(TAG, "creating a missed call");
                 }
                 handleIncomingCallIntent(intent);
             } else if (action.equals(ACTION_MISSED_CALL)) {
@@ -552,6 +652,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             } else {
                 Log.e(TAG, "received broadcast unhandled action " + action);
             }
+            registerForCallInvites();
         }
     }
 
@@ -573,7 +674,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
 
         TwilioVoiceModule.this.accessToken = accessToken;
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "initWithAccessToken ACTION_FCM_TOKEN");
+            Log.d(TAG, "initWithAccessToken");
         }
         registerForCallInvites();
         WritableMap params = Arguments.createMap();
@@ -624,25 +725,27 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
      * If a valid google-services.json has not been provided or the FirebaseInstanceId has not been
      * initialized the fcmToken will be null.
      *
-     * In the case where the FirebaseInstanceId has not yet been initialized the
-     * VoiceFirebaseInstanceIDService.onTokenRefresh should result in a LocalBroadcast to this
-     * activity which will attempt registerForCallInvites again.
-     *
      */
     private void registerForCallInvites() {
-        FirebaseApp.initializeApp(getReactApplicationContext());
-        final String fcmToken = FirebaseInstanceId.getInstance().getToken();
+        FirebaseInstanceId.getInstance().getInstanceId()
+                .addOnCompleteListener(new OnCompleteListener<InstanceIdResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<InstanceIdResult> task) {
+                        if (!task.isSuccessful()) {
+                            Log.w(TAG, "getInstanceId failed", task.getException());
+                            return;
+                        }
 
-        Log.d(TAG, "FCM Token: " + fcmToken);
-
-        if (fcmToken != null) {
-            if (BuildConfig.DEBUG) {
-                Log.d(TAG, "Registering with FCM");
-            }
-            Voice.register(accessToken, Voice.RegistrationChannel.FCM, fcmToken, registrationListener);
-        } else {
-            Log.e(TAG, "Empty FCM token");
-        }
+                        // Get new Instance ID token
+                        String fcmToken = task.getResult().getToken();
+                        if (fcmToken != null) {
+                            if (BuildConfig.DEBUG) {
+                                Log.d(TAG, "Registering with FCM");
+                            }
+                            Voice.register(accessToken, Voice.RegistrationChannel.FCM, fcmToken, registrationListener);
+                        }
+                    }
+                });
     }
 
     public void accept() {
@@ -681,33 +784,107 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 }
                 spawnActivity(getCurrentActivity(), AutomaticCallScreenActivity.class, data);
             }
+            activeCallInvite.accept(getReactApplicationContext(), callListener);
+            clearIncomingNotification(activeCallInvite);
         } else {
             if (BuildConfig.DEBUG) {
                 Log.d(TAG, "There is no active call");
             }
+            eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, null);
         }
     }
 
     public void reject() {
         callAccepted = false;
         SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
-        if (activeCallInvite != null){
+        WritableMap params = Arguments.createMap();
+        if (activeCallInvite != null) {
+            params.putString("call_sid", activeCallInvite.getCallSid());
+            params.putString("call_from", activeCallInvite.getFrom());
+            params.putString("call_to", activeCallInvite.getTo());
+            params.putString("call_state", "REJECTED");
             activeCallInvite.reject(getReactApplicationContext());
             clearIncomingNotification(activeCallInvite);
         }
-        eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, null);
+        eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
     }
 
     @ReactMethod
     public void ignore() {
         callAccepted = false;
         SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
-        if (activeCallInvite != null){
+        WritableMap params = Arguments.createMap();
+        if (activeCallInvite != null) {
+            params.putString("call_sid", activeCallInvite.getCallSid());
+            params.putString("call_from", activeCallInvite.getFrom());
+            params.putString("call_to", activeCallInvite.getTo());
+            params.putString("call_state", "BUSY");
             clearIncomingNotification(activeCallInvite);
         }
-        eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, null);
+        eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, params);
     }
 
+    @ReactMethod
+    public void connect(ReadableMap params) {
+
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "connect params: " + params);
+        }
+        WritableMap errParams = Arguments.createMap();
+        if (accessToken == null) {
+            errParams.putString("err", "Invalid access token");
+            eventManager.sendEvent(EVENT_DEVICE_NOT_READY, errParams);
+            return;
+        }
+        if (params == null) {
+            errParams.putString("err", "Invalid parameters");
+            eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, errParams);
+            return;
+        } else if (!params.hasKey("To")) {
+            errParams.putString("err", "Invalid To parameter");
+            eventManager.sendEvent(EVENT_CONNECTION_DID_DISCONNECT, errParams);
+            return;
+        }
+        toNumber = params.getString("To");
+        if (params.hasKey("ToName")) {
+            toName = params.getString("ToName");
+        }
+
+
+        twiMLParams.clear();
+
+        ReadableMapKeySetIterator iterator = params.keySetIterator();
+        while (iterator.hasNextKey()) {
+            String key = iterator.nextKey();
+            ReadableType readableType = params.getType(key);
+            switch (readableType) {
+                case Null:
+                    twiMLParams.put(key, "");
+                    break;
+                case Boolean:
+                    twiMLParams.put(key, String.valueOf(params.getBoolean(key)));
+                    break;
+                case Number:
+                    // Can be int or double.
+                    twiMLParams.put(key, String.valueOf(params.getDouble(key)));
+                    break;
+                case String:
+                    twiMLParams.put(key, params.getString(key));
+                    break;
+                default:
+                    Log.d(TAG, "Could not convert with key: " + key + ".");
+                    break;
+            }
+        }
+
+        ConnectOptions connectOptions = new ConnectOptions.Builder(accessToken)
+                .params(twiMLParams)
+                .build();
+
+        activeCall = Voice.connect(getReactApplicationContext(), connectOptions, callListener);
+    }
+
+    @ReactMethod
     public void disconnect() {
         if (activeCall != null) {
             activeCall.disconnect();
@@ -732,10 +909,84 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
         }
     }
 
+    @ReactMethod
+    public void getActiveCall(Promise promise) {
+        if (activeCall != null) {
+            if (BuildConfig.DEBUG) {
+                Log.d(TAG, "Active call found state = " + activeCall.getState());
+            }
+            WritableMap params = Arguments.createMap();
+            params.putString("call_sid", activeCall.getSid());
+            params.putString("call_from", activeCall.getFrom());
+            params.putString("call_to", activeCall.getTo());
+            params.putString("call_state", activeCall.getState().name());
+            promise.resolve(params);
+            return;
+        }
+        if (activeCallInvite != null) {
+            if (BuildConfig.DEBUG) {
+                // Log.d(TAG, "Active call invite found state = "+activeCallInvite.getState());
+            }
+            WritableMap params = Arguments.createMap();
+            params.putString("call_sid", activeCallInvite.getCallSid());
+            params.putString("call_from", activeCallInvite.getFrom());
+            params.putString("call_to", activeCallInvite.getTo());
+            if (activeCall != null)
+                params.putString("call_state", activeCall.getState().name());
+            promise.resolve(params);
+            return;
+        }
+        promise.resolve(null);
+    }
+
+    @ReactMethod
     public void setSpeakerPhone(Boolean value) {
         // TODO check whether it is necessary to call setAudioFocus again
-        //        setAudioFocus();
+//        setAudioFocus();
         audioManager.setSpeakerphoneOn(value);
+    }
+
+    private void setAudioFocus(boolean setFocus) {
+        if (audioManager != null) {
+            if (setFocus) {
+                savedAudioMode = audioManager.getMode();
+                // Request audio focus before making any device switch.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    AudioAttributes playbackAttributes = new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .build();
+                    AudioFocusRequest focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                            .setAudioAttributes(playbackAttributes)
+                            .setAcceptsDelayedFocusGain(true)
+                            .setOnAudioFocusChangeListener(new AudioManager.OnAudioFocusChangeListener() {
+                                @Override
+                                public void onAudioFocusChange(int i) {
+                                }
+                            })
+                            .build();
+                    audioManager.requestAudioFocus(focusRequest);
+                } else {
+                    int focusRequestResult = audioManager.requestAudioFocus(new AudioManager.OnAudioFocusChangeListener() {
+
+                                                                                @Override
+                                                                                public void onAudioFocusChange(int focusChange) {
+                                                                                }
+                                                                            }, AudioManager.STREAM_VOICE_CALL,
+                            AudioManager.AUDIOFOCUS_GAIN_TRANSIENT);
+                }
+                /*
+                 * Start by setting MODE_IN_COMMUNICATION as default audio mode. It is
+                 * required to be in this mode when playout and/or recording starts for
+                 * best possible VoIP performance. Some devices have difficulties with speaker mode
+                 * if this is not set.
+                 */
+                audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+            } else {
+                audioManager.setMode(savedAudioMode);
+                audioManager.abandonAudioFocus(null);
+            }
+        }
     }
 
     private boolean checkPermissionForMicrophone() {
@@ -743,51 +994,14 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
         return resultMic == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void setAudioFocus() {
-        if (audioManager == null) {
+    private void requestPermissionForMicrophone() {
+        if (getCurrentActivity() == null) {
             return;
         }
-        originalAudioMode = audioManager.getMode();
-        // Request audio focus before making any device switch
-        if (Build.VERSION.SDK_INT >= 26) {
-            AudioAttributes playbackAttributes = new AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_VOICE_COMMUNICATION)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                .build();
-            focusRequest = new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
-                .setAudioAttributes(playbackAttributes)
-                .setAcceptsDelayedFocusGain(true)
-                .setOnAudioFocusChangeListener(new AudioManager.OnAudioFocusChangeListener() {
-                    @Override
-                    public void onAudioFocusChange(int i) { }
-                })
-                .build();
-            audioManager.requestAudioFocus(focusRequest);
-        } else {
-            audioManager.requestAudioFocus(
-                null,
-                AudioManager.STREAM_VOICE_CALL,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE
-            );
-        }
-        /*
-         * Start by setting MODE_IN_COMMUNICATION as default audio mode. It is
-         * required to be in this mode when playout and/or recording starts for
-         * best possible VoIP performance. Some devices have difficulties with speaker mode
-         * if this is not set.
-         */
-        audioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
-    }
-
-    private void unsetAudioFocus() {
-        if (audioManager == null) {
-            return;
-        }
-        audioManager.setMode(originalAudioMode);
-        if (Build.VERSION.SDK_INT >= 26) {
-            if (focusRequest != null) {
-                audioManager.abandonAudioFocusRequest(focusRequest);
-            }
+        if (ActivityCompat.shouldShowRequestPermissionRationale(getCurrentActivity(), Manifest.permission.RECORD_AUDIO)) {
+//            Snackbar.make(coordinatorLayout,
+//                    "Microphone permissions needed. Please allow in your application settings.",
+//                    SNACKBAR_DURATION).show();
         } else {
             audioManager.abandonAudioFocus(null);
         }
