@@ -2,26 +2,17 @@
 
 buildscript {
     repositories {
-<<<<<<< HEAD
         maven { url 'https://maven.fabric.io/public' }
         maven {
             url 'https://maven.google.com'
             name 'Google'
         }
-=======
-        google()
->>>>>>> 05e974efc512a9435cf5dc7bec8705b23a7590df
         jcenter()
         google()
     }
     dependencies {
-<<<<<<< HEAD
-        classpath 'com.android.tools.build:gradle:3.4.2'
-        classpath 'com.google.gms:google-services:4.3.3'
-=======
         classpath 'com.android.tools.build:gradle:3.5.2'
-        classpath 'com.google.gms:google-services:4.2.0'
->>>>>>> 05e974efc512a9435cf5dc7bec8705b23a7590df
+        classpath 'com.google.gms:google-services:4.3.3'
 
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
@@ -30,11 +21,7 @@ buildscript {
 
 allprojects {
     repositories {
-<<<<<<< HEAD
         mavenLocal()
-=======
-        google()
->>>>>>> 05e974efc512a9435cf5dc7bec8705b23a7590df
         jcenter()
         google()
         maven { url "https://jitpack.io" }
