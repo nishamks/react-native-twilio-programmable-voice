@@ -1,25 +1,22 @@
 package com.hoxfon.react.RNTwilioVoice.fcm;
 
-import android.annotation.TargetApi;
 import android.app.ActivityManager;
 import android.content.Intent;
-import android.os.Bundle;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
-import android.util.Log;
-
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import android.util.Log;
 
 import com.facebook.react.ReactApplication;
 import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContext;
+
 import com.google.firebase.messaging.FirebaseMessagingService;
 import com.google.firebase.messaging.RemoteMessage;
 import com.hoxfon.react.RNTwilioVoice.BuildConfig;
 import com.hoxfon.react.RNTwilioVoice.CallNotificationManager;
-import com.hoxfon.react.RNTwilioVoice.SoundPoolManager;
-import com.twilio.voice.CallException;
 import com.twilio.voice.CallInvite;
 import com.twilio.voice.CancelledCallInvite;
 import com.twilio.voice.MessageListener;
@@ -28,14 +25,14 @@ import com.twilio.voice.Voice;
 import java.util.Map;
 import java.util.Random;
 
-import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
-import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_CANCEL_CALL;
+import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.TAG;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_FCM_TOKEN;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_INCOMING_CALL;
-import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.CANCELLED_CALL_INVITE;
+import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_CANCEL_CALL_INVITE;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.INCOMING_CALL_INVITE;
+import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.CANCELLED_CALL_INVITE;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.INCOMING_CALL_NOTIFICATION_ID;
-import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.TAG;
+import com.hoxfon.react.RNTwilioVoice.SoundPoolManager;
 
 public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
 
@@ -56,7 +53,6 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
 
-
     /**
      * Called when message is received.
      *
@@ -64,14 +60,9 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
      */
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
-
         if (BuildConfig.DEBUG) {
-            Log.d(TAG, "Received onMessageReceived()");
             Log.d(TAG, "Bundle data: " + remoteMessage.getData());
-            Log.d(TAG, "From: " + remoteMessage.getFrom());
         }
-
-        Log.d(TAG, "Incoming notification: " + remoteMessage.getData());
 
         // Check if message contains a data payload.
         if (remoteMessage.getData().size() > 0) {
@@ -81,7 +72,7 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
             Random randomNumberGenerator = new Random(System.currentTimeMillis());
             final int notificationId = randomNumberGenerator.nextInt();
 
-            boolean valid = Voice.handleMessage(getApplicationContext(), data, new MessageListener() {
+            boolean valid = Voice.handleMessage(data, new MessageListener() {
                 @Override
                 public void onCallInvite(final CallInvite callInvite) {
 
@@ -96,35 +87,66 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
                             ReactContext context = mReactInstanceManager.getCurrentReactContext();
                             // If it's constructed, send a notification
                             if (context != null) {
-                                int appImportance = callNotificationManager.getApplicationImportance((ReactApplicationContext) context);
+                                int appImportance = callNotificationManager.getApplicationImportance((ReactApplicationContext)context);
                                 if (BuildConfig.DEBUG) {
                                     Log.d(TAG, "CONTEXT present appImportance = " + appImportance);
                                 }
-                                Intent launchIntent = callNotificationManager.getLaunchIntent(
-                                    (ReactApplicationContext)context,
-                                    notificationId,
-                                    callInvite,
-                                    false,
-                                    appImportance
-                                );
+
+                                
+                                
                                 // app is not in foreground
                                 if (appImportance != ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                                    launchIntent.addFlags(FLAG_ACTIVITY_NEW_TASK);
-                                    context.startActivity(launchIntent);
+
+                                    boolean shouldStartNewTask = false;
+
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                        shouldStartNewTask = true;
+                                    }
+
+                                    Intent launchIntent = callNotificationManager.getLaunchIntent(
+                                        (ReactApplicationContext)context,
+                                        notificationId,
+                                        callInvite,
+                                        shouldStartNewTask,
+                                        appImportance
+                                    );
+
+                                    // Starting with Android 10 applications can't launch an activity when in background.
+                                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                                        Intent intent = new Intent(ACTION_INCOMING_CALL);
+                                        intent.putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId);
+                                        intent.putExtra(INCOMING_CALL_INVITE, callInvite);
+                                        LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+                                        callNotificationManager.createIncomingCallNotification(
+                                                (ReactApplicationContext) context, callInvite, notificationId,
+                                                launchIntent);
+                                    } else {
+                                        context.startActivity(launchIntent);
+                                    }
                                 }
-                                VoiceFirebaseMessagingService.this.handleIncomingCall((ReactApplicationContext) context, notificationId, callInvite, launchIntent);
+
+                                Intent intent = new Intent(ACTION_INCOMING_CALL);
+                                intent.putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId);
+                                intent.putExtra(INCOMING_CALL_INVITE, callInvite);
+                                LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+
                             } else {
                                 // Otherwise wait for construction, then handle the incoming call
                                 mReactInstanceManager.addReactInstanceEventListener(new ReactInstanceManager.ReactInstanceEventListener() {
                                     public void onReactContextInitialized(ReactContext context) {
-                                        int appImportance = callNotificationManager.getApplicationImportance((ReactApplicationContext) context);
+                                        int appImportance = callNotificationManager.getApplicationImportance((ReactApplicationContext)context);
                                         if (BuildConfig.DEBUG) {
                                             Log.d(TAG, "CONTEXT not present appImportance = " + appImportance);
                                         }
-                                        Intent launchIntent = callNotificationManager.getLaunchIntent((ReactApplicationContext) context, notificationId, callInvite, true, appImportance);
-                                        launchIntent.addFlags(FLAG_ACTIVITY_NEW_TASK);
+                                        Intent launchIntent = callNotificationManager.getLaunchIntent((ReactApplicationContext)context, notificationId, callInvite, true, appImportance);
                                         context.startActivity(launchIntent);
-                                        VoiceFirebaseMessagingService.this.handleIncomingCall((ReactApplicationContext) context, notificationId, callInvite, launchIntent);
+                                        Intent intent = new Intent(ACTION_INCOMING_CALL);
+                                        intent.putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId);
+                                        intent.putExtra(INCOMING_CALL_INVITE, callInvite);
+                                        LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
+                                        callNotificationManager.createIncomingCallNotification(
+                                                (ReactApplicationContext) context, callInvite, notificationId,
+                                                launchIntent);
                                     }
                                 });
                                 if (!mReactInstanceManager.hasStartedCreatingInitialContext()) {
@@ -137,22 +159,18 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
                 }
 
                 @Override
-                public void onCancelledCallInvite(final CancelledCallInvite cancelledCallInvite, final CallException callException) {
+                public void onCancelledCallInvite(final CancelledCallInvite cancelledCallInvite) {
                     Handler handler = new Handler(Looper.getMainLooper());
                     handler.post(new Runnable() {
                         public void run() {
-                            ReactInstanceManager mReactInstanceManager = ((ReactApplication) getApplication()).getReactNativeHost().getReactInstanceManager();
-                            ReactContext context = mReactInstanceManager.getCurrentReactContext();
-                            VoiceFirebaseMessagingService.this.cancelNotification((ReactApplicationContext)context, cancelledCallInvite);
-                            VoiceFirebaseMessagingService.this.sendCancelledCallInviteToActivity(
-                                cancelledCallInvite);
+                            VoiceFirebaseMessagingService.this.sendCancelledCallInviteToActivity(cancelledCallInvite);
                         }
                     });
                 }
             });
 
             if (!valid) {
-                Log.e(TAG, "Error handling FCM message");
+                Log.e(TAG, "The message was not a valid Twilio Voice SDK payload: " + remoteMessage.getData());
             }
         }
 
@@ -162,43 +180,13 @@ public class VoiceFirebaseMessagingService extends FirebaseMessagingService {
         }
     }
 
-    private void handleIncomingCall(ReactApplicationContext context,
-        int notificationId,
-        CallInvite callInvite,
-        Intent launchIntent
-    ) {
-        Intent intent = new Intent(ACTION_INCOMING_CALL);
-        intent.putExtra(INCOMING_CALL_NOTIFICATION_ID, notificationId);
-        intent.putExtra(INCOMING_CALL_INVITE, callInvite);
-        LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
-        showNotification(context, callInvite, notificationId, launchIntent);
-    }
-
     /*
-     * Send the CancelledCallInvite to the VoiceActivity
+     * Send the CancelledCallInvite to the TwilioVoiceModule
      */
     private void sendCancelledCallInviteToActivity(CancelledCallInvite cancelledCallInvite) {
-        Intent intent = new Intent(ACTION_CANCEL_CALL);
+        SoundPoolManager.getInstance((this)).stopRinging();
+        Intent intent = new Intent(ACTION_CANCEL_CALL_INVITE);
         intent.putExtra(CANCELLED_CALL_INVITE, cancelledCallInvite);
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
     }
-
-    /*
-     * Show the notification in the Android notification drawer
-     */
-    @TargetApi(20)
-    private void showNotification(ReactApplicationContext context,
-                                  CallInvite callInvite,
-                                  int notificationId,
-                                  Intent launchIntent
-    ) {
-        callNotificationManager.createIncomingCallNotification(context, callInvite, notificationId, launchIntent);
-    }
-
-    private void cancelNotification(ReactApplicationContext context, CancelledCallInvite cancelledCallInvite) {
-        SoundPoolManager.getInstance((this)).stopRinging();
-        callNotificationManager.removeIncomingCallNotification(context, cancelledCallInvite, 0);
-    }
-
-
 }

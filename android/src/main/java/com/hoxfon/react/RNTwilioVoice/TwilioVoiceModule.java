@@ -293,11 +293,6 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             }
 
             @Override
-            public void onRinging(Call call) {
-                Log.d(TAG, "Ringing");
-            }
-
-            @Override
             public void onConnected(Call call) {
                 if (BuildConfig.DEBUG) {
                     Log.d(TAG, "CALL CONNECTED callListener().onConnected call state = " + call.getState());
@@ -646,6 +641,12 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 SharedPreferences.Editor sharedPrefEditor = sharedPref.edit();
                 sharedPrefEditor.remove(MISSED_CALLS_GROUP);
                 sharedPrefEditor.commit();
+                
+            } else if (action.equals(ACTION_CLEAR_MISSED_CALLS_COUNT)) {
+                SharedPreferences sharedPref = context.getSharedPreferences(PREFERENCE_KEY, Context.MODE_PRIVATE);
+                SharedPreferences.Editor sharedPrefEditor = sharedPref.edit();
+                sharedPrefEditor.putInt(MISSED_CALLS_GROUP, 0);
+                sharedPrefEditor.commit();
             } else if (action.equals(ACTION_HANGUP_CALL)) {
                 disconnect();
             } else if (action.equals(ACTION_ALLOW_VISITOR)) {
@@ -661,7 +662,8 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
             } else {
                 Log.e(TAG, "received broadcast unhandled action " + action);
             }
-            registerForCallInvites();
+            notificationManager.cancel(intent.getIntExtra(INCOMING_CALL_NOTIFICATION_ID, 0));
+            //registerForCallInvites();
         }
     }
 

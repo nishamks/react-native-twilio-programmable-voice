@@ -180,7 +180,7 @@ public class CallNotificationManager {
             return;
         }
         NotificationChannel channel = new NotificationChannel(VOICE_CHANNEL,
-                "Primary Voice Channel", NotificationManager.IMPORTANCE_DEFAULT);
+                "Primary Voice Channel", NotificationManager.IMPORTANCE_HIGH);
         channel.setLightColor(Color.GREEN);
         channel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         notificationManager.createNotificationChannel(channel);
