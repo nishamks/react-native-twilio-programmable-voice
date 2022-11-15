@@ -852,11 +852,13 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                 Log.d(TAG, "accept() Automatic Call");
                 setSpeakerPhone(false);
 
-                SQLiteDatabase readableDatabase = ReactDatabaseSupplier.getInstance(getReactApplicationContext()).getReadableDatabase();
-                String keenvilData = AsyncLocalStorageUtil.getItemImpl(readableDatabase, "persist:Keenvil");
+               
                 HashMap<String, String> data = new HashMap<String, String>();
 
                 try {
+                     SQLiteDatabase readableDatabase = ReactDatabaseSupplier.getInstance(getReactApplicationContext()).getReadableDatabase();
+                String keenvilData = AsyncLocalStorageUtil.getItemImpl(readableDatabase, "persist:Keenvil");
+                    
                     JSONObject keenvilDataObject = new JSONObject(keenvilData);
                     String sessionData = keenvilDataObject.getString("session");
                     Log.d(TAG, "Session data " + sessionData);
@@ -867,8 +869,9 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     Log.d(TAG, String.format("Auth token: [%s]", sessionObject.getString("token")));
                     Log.d(TAG, "accept() Extra Info Added");
 
-                } catch (JSONException ex) {
+                } catch (Exception ex) {
                     //Do nothing and spawn the activity with no data.
+                    
                 }
 
                 if (getCurrentActivity() != null) {
