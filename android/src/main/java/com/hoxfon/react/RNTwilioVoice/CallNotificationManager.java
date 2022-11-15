@@ -190,9 +190,11 @@ public class CallNotificationManager {
                         .setPriority(NotificationCompat.PRIORITY_HIGH)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setCategory(NotificationCompat.CATEGORY_CALL)
+                        .setColorized(true)
+                        .setColor(Color.parseColor("#3fcac2"))
                         .setSmallIcon(R.drawable.ic_call_white_24dp)
-                        .setContentTitle("Llamada entrante")
-                        .setContentText("Keenvil")
+                        .setContentTitle("Incoming Call")
+                        .setContentText("Clarity Hotline")
                         .setOngoing(true)
                         .setAutoCancel(true)
                         .setExtras(extras)
@@ -221,7 +223,7 @@ public class CallNotificationManager {
 
         PendingIntent pendingRejectIntent = PendingIntent.getBroadcast(context, 1,
                 rejectIntent,  PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        notificationBuilder.addAction(0, "RECHAZAR", pendingRejectIntent);
+        notificationBuilder.addAction(0, "Reject", pendingRejectIntent);
 
         // Answer action
         Intent answerIntent = new Intent(ACTION_ANSWER_CALL);
@@ -235,7 +237,7 @@ public class CallNotificationManager {
 
         PendingIntent pendingAnswerIntent = PendingIntent.getBroadcast(context, 0,
                 answerIntent,  PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-        notificationBuilder.addAction(R.drawable.ic_call_white_24dp, "ACEPTAR",
+        notificationBuilder.addAction(R.drawable.ic_call_white_24dp, "Accept",
                 pendingAnswerIntent);
 
         notificationManager.notify(notificationId, notificationBuilder.build());
@@ -290,8 +292,10 @@ public class CallNotificationManager {
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                         .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                         .setSmallIcon(R.drawable.ic_call_missed_white_24dp)
-                        .setContentTitle("Llamada perdida")
-                        .setContentText("Keenvil")
+                        .setColorized(true)
+                        .setColor(Color.parseColor("#3fcac2"))
+                        .setContentTitle("Incoming Call")
+                        .setContentText("Clarity Hotline")
                         .setAutoCancel(true)
                         .setShowWhen(true)
                         .setExtras(extras)
@@ -302,11 +306,11 @@ public class CallNotificationManager {
         missedCalls++;
         if (missedCalls == 1) {
             inboxStyle = new NotificationCompat.InboxStyle();
-            inboxStyle.setBigContentTitle("Llamada perdida");
+            inboxStyle.setBigContentTitle("Clarity Hotline");
         } else {
-            inboxStyle.setBigContentTitle(String.valueOf(missedCalls) + " llamadas perdidas");
+            inboxStyle.setBigContentTitle(String.valueOf(missedCalls) + " Clarity Hotline");
         }
-        inboxStyle.addLine("de Keenvil");
+        inboxStyle.addLine("Hotline Call");
         sharedPrefEditor.putInt(MISSED_CALLS_GROUP, missedCalls);
         sharedPrefEditor.commit();
         
@@ -348,12 +352,14 @@ public class CallNotificationManager {
         extras.putString(NOTIFICATION_TYPE, ACTION_HANGUP_CALL);
 
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, VOICE_CHANNEL)
-                .setContentTitle("Llamada en Progreso")
+                .setContentTitle("Hotline call in progress")
                 .setContentText(caller)
                 .setSmallIcon(R.drawable.ic_call_white_24dp)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setColorized(true)
+                .setColor(Color.parseColor("#3fcac2"))
                 .setOngoing(true)
                 .setUsesChronometer(true)
                 .setExtras(extras)
