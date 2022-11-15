@@ -82,7 +82,7 @@ public class AutomaticCallScreenActivity extends ReactActivity {
     String baseUrl = sharedPref.getString("BASE_URL", "");
     s3Url = sharedPref.getString("S3_URL", "");
 
-    visitorService = new VisitorClient(baseUrl);
+//    visitorService = new VisitorClient(baseUrl);
 
     automaticCallBroadcastReceiver = new AutomaticCallScreenActivity.AutomaticCallBroadcastReceiver();
     registerReceiver();
@@ -174,30 +174,30 @@ public class AutomaticCallScreenActivity extends ReactActivity {
   private void requestVisitorProfile(final String token,
       final String callSid) {
 
-    compositeDisposable.add(visitorService.getVisitorInfo(token, callSid)
-      .subscribeOn(Schedulers.io()) // "work" on io thread
-      .observeOn(AndroidSchedulers.mainThread()) // "listen" on UIThread
-      .subscribeWith(new DisposableObserver<Visitor>() {
-        @Override
-        public void onNext(final Visitor visitor) {
-            Log.d(TAG, "Accept Visitor Information");
-            ImageView visitorAvatar = (ImageView) findViewById(R.id.visitor_avatar);
-            ImageDownloader imageDownLoader = new ImageDownloader(visitorAvatar);
-            imageDownLoader.execute(String.format("%s/%s", s3Url, visitor.getVisitorAvatarUri()));
-            displayVisitorCard(visitor);
-        }
-
-        @Override
-        public void onError(Throwable e) {
-          Log.e(TAG, "Error on request", e);
-        }
-
-        @Override
-        public void onComplete() {
-
-        }
-      })
-    );
+//    compositeDisposable.add(visitorService.getVisitorInfo(token, callSid)
+//      .subscribeOn(Schedulers.io()) // "work" on io thread
+//      .observeOn(AndroidSchedulers.mainThread()) // "listen" on UIThread
+//      .subscribeWith(new DisposableObserver<Visitor>() {
+//        @Override
+//        public void onNext(final Visitor visitor) {
+//            Log.d(TAG, "Accept Visitor Information");
+//            ImageView visitorAvatar = (ImageView) findViewById(R.id.visitor_avatar);
+//            ImageDownloader imageDownLoader = new ImageDownloader(visitorAvatar);
+//            imageDownLoader.execute(String.format("%s/%s", s3Url, visitor.getVisitorAvatarUri()));
+//            displayVisitorCard(visitor);
+//        }
+//
+//        @Override
+//        public void onError(Throwable e) {
+//          Log.e(TAG, "Error on request", e);
+//        }
+//
+//        @Override
+//        public void onComplete() {
+//
+//        }
+//      })
+//    );
   }
 
   private void displayVisitorCard(final Visitor visitor) {
