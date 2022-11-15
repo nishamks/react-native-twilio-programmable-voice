@@ -8,17 +8,16 @@
   <LinearLayout
       android:id="@+id/headerContainer"
       android:layout_width="match_parent"
-      android:layout_height="match_parent"
+      android:layout_height="wrap_content"
       android:orientation="vertical"
       >
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="10pt"
         android:layout_marginTop="20pt"
         android:gravity="center_horizontal"
-        android:paddingTop="20pt"
-        android:text="LLAMADA DE VOZ DE KEENVIL"
+        android:paddingTop="10pt"
+        android:text="Clarity Hotline Call"
         android:textAlignment="center"
         android:textColor="@color/white"
         android:textSize="8pt"
@@ -27,16 +26,24 @@
         android:id="@+id/textView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_margin="10pt"
         android:layout_marginTop="20pt"
         android:gravity="center_horizontal"
-        android:text="SEGURIDAD"
+        android:text=""
         android:textAlignment="center"
         android:textColor="@color/white"
         android:textSize="14pt"
         android:textStyle="bold"
         />
   </LinearLayout>
+
+  <ImageView
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_below="@id/headerContainer"
+      android:contentDescription=""
+
+      android:src="@drawable/guard_icon"
+      android:visibility="invisible" />
   <LinearLayout
       android:id="@+id/actionsContainer"
       android:layout_width="match_parent"
@@ -44,7 +51,7 @@
       android:layout_alignParentBottom="true"
       android:gravity="center"
       android:orientation="vertical"
-      android:paddingBottom="20pt"
+      android:paddingBottom="10pt"
       >
     <Button
         android:id="@+id/speaker_btn"
@@ -52,9 +59,9 @@
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
         android:drawablePadding="5pt"
-        android:drawableTop="@drawable/speaker_off"
+        android:drawableTop="@drawable/speaker_on"
         android:paddingBottom="10pt"
-        android:text="Altavoz"
+        android:text="Speaker"
         android:textColor="@android:color/white"
         />
     <Button
@@ -64,7 +71,7 @@
         android:background="@android:color/transparent"
         android:drawablePadding="5pt"
         android:drawableTop="@drawable/hang_up_btn"
-        android:text="Finalizar"
+        android:text="End"
         android:textColor="@android:color/white"
         />
   </LinearLayout>
