@@ -17,7 +17,7 @@
         android:layout_marginTop="20pt"
         android:gravity="center_horizontal"
         android:paddingTop="10pt"
-        android:text="LLAMADA DE VOZ DE KEENVIL"
+        android:text="Clarity Hotline Call"
         android:textAlignment="center"
         android:textColor="@color/white"
         android:textSize="8pt"
@@ -28,20 +28,22 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20pt"
         android:gravity="center_horizontal"
-        android:text="SEGURIDAD"
+        android:text=""
         android:textAlignment="center"
         android:textColor="@color/white"
         android:textSize="14pt"
         android:textStyle="bold"
         />
   </LinearLayout>
+
   <ImageView
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
       android:layout_below="@id/headerContainer"
+      android:contentDescription=""
+
       android:src="@drawable/guard_icon"
-      android:contentDescription="Keenvil Seguridad"
-      />
+      android:visibility="invisible" />
   <LinearLayout
       android:id="@+id/actionsContainer"
       android:layout_width="match_parent"
@@ -59,7 +61,7 @@
         android:drawablePadding="5pt"
         android:drawableTop="@drawable/speaker_on"
         android:paddingBottom="10pt"
-        android:text="Altavoz"
+        android:text="Speaker"
         android:textColor="@android:color/white"
         />
     <Button
@@ -69,7 +71,7 @@
         android:background="@android:color/transparent"
         android:drawablePadding="5pt"
         android:drawableTop="@drawable/hang_up_btn"
-        android:text="Finalizar"
+        android:text="End"
         android:textColor="@android:color/white"
         />
   </LinearLayout>
