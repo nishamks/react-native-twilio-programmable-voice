@@ -820,7 +820,7 @@ public class TwilioVoiceModule extends ReactContextBaseJavaModule implements Act
                     }
                 });
     }
-
+    @ReactMethod
     public void accept() {
         callAccepted = true;
         SoundPoolManager.getInstance(getReactApplicationContext()).stopRinging();
