@@ -36,14 +36,15 @@
         />
   </LinearLayout>
 
-  <ImageView
+  <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:layout_below="@id/headerContainer"
-      android:contentDescription=""
+      android:layout_alignTop="@+id/actionsContainer"
+      android:layout_marginTop="-598dp">
 
-      android:src="@drawable/guard_icon"
-      android:visibility="invisible" />
+  </LinearLayout>
+
+
   <LinearLayout
       android:id="@+id/actionsContainer"
       android:layout_width="match_parent"
@@ -51,28 +52,89 @@
       android:layout_alignParentBottom="true"
       android:gravity="center"
       android:orientation="vertical"
-      android:paddingBottom="10pt"
-      >
+      android:paddingBottom="10pt">
+
     <Button
+        android:visibility="gone"
         android:id="@+id/speaker_btn"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:background="@android:color/transparent"
-        android:drawablePadding="5pt"
         android:drawableTop="@drawable/speaker_on"
+        android:drawablePadding="5pt"
         android:paddingBottom="10pt"
         android:text="Speaker"
-        android:textColor="@android:color/white"
-        />
-    <Button
-        android:id="@+id/disconnect_call_btn"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:background="@android:color/transparent"
-        android:drawablePadding="5pt"
-        android:drawableTop="@drawable/hang_up_btn"
-        android:text="End"
-        android:textColor="@android:color/white"
-        />
+        android:textColor="@android:color/white" />
+    <LinearLayout
+        android:weightSum="3"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+      <ImageButton
+          android:id="@+id/muteOn"
+          android:layout_weight="1"
+          android:visibility="gone"
+          android:src="@drawable/mic"
+          android:layout_marginTop="20dp"
+          android:background="@color/iris"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"/>
+      <ImageButton
+          android:id="@+id/muteOff"
+          android:layout_weight="1"
+          android:visibility="visible"
+          android:src="@drawable/muteoff"
+          android:layout_marginTop="20dp"
+          android:background="@color/iris"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"/>
+
+      <Button
+          android:layout_weight="1"
+          android:id="@+id/disconnect_call_btn"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:background="@android:color/transparent"
+          android:drawableTop="@drawable/hang_up_btn"
+          android:drawablePadding="5pt"
+          android:textColor="@android:color/white" />
+      <ImageButton
+          android:id="@+id/speakerOff"
+          android:visibility="visible"
+          android:layout_weight="1"
+          android:layout_marginTop="20dp"
+          android:src="@drawable/speaker"
+          android:background="@color/iris"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"/>
+      <ImageButton
+          android:id="@+id/speakern"
+          android:visibility="gone"
+          android:layout_weight="1"
+          android:layout_marginTop="20dp"
+          android:src="@drawable/speakeron"
+          android:background="@color/iris"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"/>
+    </LinearLayout>
+
   </LinearLayout>
+
+  <ImageView
+
+      android:layout_width="140dp"
+      android:layout_height="140dp"
+      android:layout_below="@id/headerContainer"
+      android:layout_alignParentStart="true"
+
+      android:layout_alignParentLeft="true"
+      android:layout_alignParentEnd="true"
+      android:layout_alignParentRight="true"
+      android:layout_marginStart="134dp"
+      android:layout_marginLeft="134dp"
+      android:layout_marginTop="12dp"
+      android:layout_marginEnd="136dp"
+      android:layout_marginRight="136dp"
+      android:contentDescription=""
+      android:src="@drawable/woman"
+      android:visibility="visible" />
 </RelativeLayout>
