@@ -11,6 +11,8 @@ import android.util.Log;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageButton;
+
 import com.facebook.react.ReactActivity;
 import com.facebook.react.bridge.ReactContext;
 import com.hoxfon.react.RNTwilioVoice.R;
@@ -18,12 +20,10 @@ import com.hoxfon.react.RNTwilioVoice.R;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_CANCEL_CALL_INVITE;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_DISCONNECTED_CALL;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_HANGUP_CALL;
+import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_MIC_OFF;
+import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_MIC_ON;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_SPEAKER_OFF;
 import static com.hoxfon.react.RNTwilioVoice.TwilioVoiceModule.ACTION_SPEAKER_ON;
-
-/**
- * Created by estebanabait on 6/6/18.
- */
 
 public class DirectCallScreenActivity extends ReactActivity {
 
@@ -43,7 +43,7 @@ public class DirectCallScreenActivity extends ReactActivity {
             | WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
     );
 
-    setContentView(R.layout.activity_direct_call);
+    setContentView(R.layout.activity_automatic_call);
 
     final ReactContext reactContext = getReactInstanceManager().getCurrentReactContext();
 
@@ -51,6 +51,10 @@ public class DirectCallScreenActivity extends ReactActivity {
     registerReceiver();
 
     Button speakerBtn = (Button) findViewById(R.id.speaker_btn);
+    ImageButton muteOn = (ImageButton) findViewById(R.id.muteOn);
+    ImageButton muteOff = (ImageButton) findViewById(R.id.muteOff);
+    ImageButton speakerOn = (ImageButton) findViewById(R.id.speakerOn);
+    ImageButton  speakerOff = (ImageButton) findViewById(R.id.speakerOff);
     speakerBtn.setOnClickListener(new View.OnClickListener() {
       @Override
       public void onClick(View view) {
@@ -64,6 +68,57 @@ public class DirectCallScreenActivity extends ReactActivity {
         updateSpeakerButton();
         Intent intent = new Intent(action);
         LocalBroadcastManager.getInstance(reactContext).sendBroadcast(intent);
+      }
+    });
+
+    speakerOn.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        String action;
+        action = ACTION_SPEAKER_ON;
+        Intent intent = new Intent(action);
+        LocalBroadcastManager.getInstance(reactContext).sendBroadcast(intent);
+        speakerOn.setVisibility(View.GONE);
+        speakerOff.setVisibility(View.VISIBLE);
+        toggleSpeaker();
+
+      }
+    });
+
+    speakerOff.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        String action;
+        action = ACTION_SPEAKER_OFF;
+        Intent intent = new Intent(action);
+        LocalBroadcastManager.getInstance(reactContext).sendBroadcast(intent);
+        speakerOn.setVisibility(View.VISIBLE);
+        speakerOff.setVisibility(View.GONE);
+        toggleSpeaker();
+      }
+    });
+    muteOn.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        muteOff.setVisibility(View.VISIBLE);
+        muteOn.setVisibility(View.GONE);
+        String action;
+        action = ACTION_MIC_ON;
+        Intent intent = new Intent(action);
+        LocalBroadcastManager.getInstance(reactContext).sendBroadcast(intent);
+
+      }
+    });
+    muteOff.setOnClickListener(new View.OnClickListener() {
+      @Override
+      public void onClick(View v) {
+        muteOn.setVisibility(View.VISIBLE);
+        muteOff.setVisibility(View.GONE);
+        String action;
+        action = ACTION_MIC_OFF;
+        Intent intent = new Intent(action);
+        LocalBroadcastManager.getInstance(reactContext).sendBroadcast(intent);
+
       }
     });
 
